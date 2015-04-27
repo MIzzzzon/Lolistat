@@ -1,22 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+	
+	<SwitchPreference
+		android:key="enabled"
+		android:title="@string/enabled"
+		android:checked="true"/>
+	
 	<CheckBoxPreference
 		android:key="tint_navigation"
 		android:title="@string/tint_navigation"
-		android:checked="true"/>
+		android:checked="true"
+		android:dependency="enabled"/>
 	
 	<CheckBoxPreference
 		android:key="tint_icons"
 		android:title="@string/tint_icons"
-		android:checked="true"/>
+		android:checked="true"
+		android:dependency="enabled"/>
 	
-	<Preference
-		android:key="blacklist"
-		android:title="@string/blacklist"
-		android:summary="@string/blacklist_sum"/>
-	
-	<Preference
-		android:key="about"
-		android:title="@string/about"/>
+	<EditTextPreference
+		android:key="custom_color"
+		android:title="@string/custom_color"
+		android:dependency="enabled"/>
 	
 </PreferenceScreen>

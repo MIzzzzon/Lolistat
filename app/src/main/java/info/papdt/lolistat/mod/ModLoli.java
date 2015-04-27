@@ -19,6 +19,7 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
+import de.robv.android.xposed.IXposedHookZygoteInit;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.XC_MethodHook;
@@ -32,32 +33,34 @@ import info.papdt.lolistat.support.Settings;
 import info.papdt.lolistat.support.Utility;
 import static info.papdt.lolistat.BuildConfig.DEBUG;
 
-public class ModLoli implements IXposedHookLoadPackage
+public class ModLoli implements IXposedHookLoadPackage, IXposedHookZygoteInit
 {
 	private static final String TAG = ModLoli.class.getSimpleName() + ":";
 	private static final long MIN_BREAK = 500;
 	private static int STATUS_HEIGHT = 0;
+	private Settings mSettings;
 
 	@Override
 	public void handleLoadPackage(final XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
-		Settings.init();
-		
-		// If blacklisted
-		if (Settings.getBooleanStatic(lpparam.packageName, false))
-			return;
+		if (mSettings == null)
+			mSettings = Settings.getInstance(null);
 		
 		if (lpparam.packageName.equals("com.android.systemui")) {
 			ModSystemUI.hookSystemUI(lpparam.classLoader);
 			return;
 		}
+	}
+	
+	@Override
+	public void initZygote(IXposedHookZygoteInit.StartupParam param) throws Throwable {
 		
-		ModNavigationBar.hookNavigationBar(lpparam.classLoader);
-		
-		if (DEBUG) {
-			XposedBridge.log(TAG + "Loaded package " + lpparam.packageName);
+		if (mSettings == null) {
+			mSettings = Settings.getInstance(null);
 		}
 		
-		final Class<?> internalStyleable = XposedHelpers.findClass("com.android.internal.R.styleable", lpparam.classLoader);
+		ModNavigationBar.hookNavigationBar(null);
+		
+		final Class<?> internalStyleable = XposedHelpers.findClass("com.android.internal.R.styleable", null);
 		final Field internalThemeField = XposedHelpers.findField(internalStyleable, "Theme");
 		final Field internalColorPrimaryDarkField = XposedHelpers.findField(internalStyleable, "Theme_colorPrimaryDark");
 		final Field internalTranslucentStatusField = XposedHelpers.findField(internalStyleable, "Theme_windowTranslucentStatus");
@@ -79,9 +82,30 @@ public class ModLoli implements IXposedHookLoadPackage
 				int isTranslucent = XposedHelpers.getStaticIntField(XposedHelpers.findClass("com.android.internal.R.styleable", null), "Window_windowTranslucentStatus");
 				if (activity.getWindow().getWindowStyle().getBoolean(isTranslucent, false))
 					return;
+					
+				String packageName = activity.getApplicationInfo().packageName;
+				String className = activity.getClass().getName();
+				
+				if (packageName.equals("com.android.systemui"))
+					return;
+				
+				mSettings.reload();
+				
+				// Ignore if blacklisted
+				if (!mSettings.getBoolean(packageName, className, Settings.ENABLED, true))
+					return;
+				
+				// custom color
+				int custom = mSettings.getInt(packageName, className, Settings.CUSTOM_COLOR, 0);
+				
+				if (custom != 0)
+					activity.getWindow().setStatusBarColor(custom);
 				
 				// Ignore if launcher
-				if (Utility.isLauncher(activity, lpparam.packageName)) return;
+				if (Utility.isLauncher(activity, packageName)) return;
+				
+				// Ignore if custom color defined
+				if (custom != 0) return;
 				
 				// Ignore if have defined colorPrimaryDark already
 				TypedArray a = activity.getTheme().obtainStyledAttributes(theme);
